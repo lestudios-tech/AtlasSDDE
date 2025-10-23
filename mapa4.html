@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Red de Flujo Alimentario - Colombia</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #f8f9fa;
+            color: #333;
+            overflow: hidden;
+        }
+
+        #header {
+            background: linear-gradient(135deg, #2c5aa0 0%, #1a3a6a 100%);
+            color: white;
+            padding: 1.2rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        #header h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        #header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        #main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            gap: 0;
+        }
+
+        /* Panel lateral */
+        #control-panel {
+            width: 350px;
+            background: white;
+            padding: 1.5rem;
+            border-right: 1px solid #e1e5e9;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+        }
+
+        /* Contenedores principales lado a lado */
+        #visualization-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #map-container, #graph-container {
+            flex: 1;
+            position: relative;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #f8f9fa;
+        }
+
+        #graph {
+            width: 100%;
+            height: 100%;
+            background: white;
+            position: relative;
+        }
+
+        /* Paneles */
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e1e5e9;
+        }
+
+        .panel h3 {
+            color: #2c5aa0;
+            margin-bottom: 0.8rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 0.8rem;
+            border-radius: 6px;
+            text-align: center;
+            border-left: 4px solid #2c5aa0;
+        }
+
+        .stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c5aa0;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        /* Selector desplegable */
+        .selector-container {
+            margin-bottom: 1rem;
+        }
+
+        .municipio-select {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .municipio-select:hover {
+            border-color: #2c5aa0;
+        }
+
+        .municipio-select:focus {
+            outline: none;
+            border-color: #2c5aa0;
+            box-shadow: 0 0 0 3px rgba(44, 90, 160, 0.1);
+        }
+
+        /* Botones de acción */
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin: 1rem 0;
+        }
+
+        .action-btn {
+            padding: 0.8rem;
+            background: #f8f9fa;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.8rem;
+            text-align: center;
+            color: #333;
+        }
+
+        .action-btn:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .action-btn.primary {
+            background: #2c5aa0;
+            color: white;
+            border-color: #2c5aa0;
+        }
+
+        .action-btn.success {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+
+        .status-indicator {
+            padding: 0.5rem;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+
+        .status-indicator.active {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .debug-info {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>🌾 Red de Flujo Alimentario - Colombia</h1>
+        <p>Filtra la red por municipio para visualizar conexiones específicas</p>
+    </div>
+
+    <div id="main-container">
+        <!-- Panel de control lateral -->
+        <div id="control-panel">
+            <div class="panel">
+                <h3>📍 Filtro por Municipio</h3>
+                <div class="status-indicator" id="filter-status">
+                    Sin filtro activo - Mostrando toda la red
+                </div>
+                
+                <div class="selector-container">
+                    <select class="municipio-select" id="municipio-select">
+                        <option value="">-- Selecciona un municipio --</option>
+                        <!-- Las opciones se generarán aquí -->
+                    </select>
+                </div>
+                
+                <div class="action-buttons">
+                    <button class="action-btn success" onclick="applyFilter()">
+                        ✅ Aplicar Filtro
+                    </button>
+                    <button class="action-btn primary" onclick="clearFilter()">
+                        🌐 Ver Red Completa
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>📊 Información del Municipio</h3>
+                <div id="municipio-info" style="font-size: 0.8rem; color: #666;">
+                    Selecciona un municipio para ver sus detalles
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🔍 Red Filtrada</h3>
+                <div id="network-info" style="font-size: 0.8rem; color: #666;">
+                    Información de conexiones aparecerá aquí
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenedor de visualizaciones -->
+        <div id="visualization-container">
+            <!-- Mapa -->
+            <div id="map-container">
+                <div class="section-title">🗺️ Vista Geográfica</div>
+                <div class="controls">
+                    <button class="control-btn" onclick="fitMapToCities()">🔍 Ajustar Vista</button>
+                </div>
+                <div id="map"></div>
+                <div class="debug-info" id="map-debug">Cargando mapa...</div>
+            </div>
+
+            <!-- Grafo -->
+            <div id="graph-container">
+                <div class="section-title">🕸️ Vista de Red</div>
+                <div class="controls">
+                    <button class="control-btn" onclick="simulatePhysics()">⚡ Simular Física</button>
+                    <button class="control-btn" onclick="resetGraphLayout()">🔄 Reorganizar</button>
+                </div>
+                <div id="graph"></div>
+                <div class="debug-info" id="graph-debug">Cargando grafo...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Datos geoespaciales de ciudades de Colombia
+        const citiesData = {
+            "Bogotá": { lat: 4.7110, lng: -74.0721, region: "Andina", population: 8180000 },
+            "Medellín": { lat: 6.2442, lng: -75.5812, region: "Andina", population: 2520000 },
+            "Cali": { lat: 3.4516, lng: -76.5320, region: "Pacífica", population: 2240000 },
+            "Barranquilla": { lat: 10.9639, lng: -74.7964, region: "Caribe", population: 1230000 },
+            "Cartagena": { lat: 10.3910, lng: -75.4795, region: "Caribe", population: 914000 },
+            "Bucaramanga": { lat: 7.1193, lng: -73.1227, region: "Andina", population: 581000 },
+            "Cúcuta": { lat: 7.8939, lng: -72.5078, region: "Andina", population: 721000 },
+            "Pereira": { lat: 4.8133, lng: -75.6961, region: "Andina", population: 467000 }
+        };
+
+        // Datos del grafo
+        const graphData = {
+            nodes: Object.keys(citiesData).map(city => ({
+                id: city,
+                ...citiesData[city],
+                toneladas: Math.floor(Math.random() * 500) + 100
+            })),
+            links: [
+                { source: "Bogotá", target: "Medellín", value: 150, type: "exportacion", product: "Café" },
+                { source: "Bogotá", target: "Cali", value: 130, type: "exportacion", product: "Cereales" },
+                { source: "Bogotá", target: "Barranquilla", value: 110, type: "interregional", product: "Manufacturas" },
+                { source: "Medellín", target: "Cali", value: 200, type: "exportacion", product: "Banano" },
+                { source: "Medellín", target: "Bucaramanga", value: 70, type: "interregional", product: "Caña" },
+                { source: "Cali", target: "Barranquilla", value: 180, type: "interregional", product: "Arroz" },
+                { source: "Barranquilla", target: "Cartagena", value: 120, type: "local", product: "Pescado" },
+                { source: "Bucaramanga", target: "Cúcuta", value: 75, type: "interregional", product: "Cacao" },
+                { source: "Pereira", target: "Medellín", value: 65, type: "local", product: "Café" }
+            ]
+        };
+
+        // Variables globales
+        let map, simulation, svg;
+        let nodeGroup, linkGroup;
+        let cityMarkers = {};
+        let selectedMunicipio = null;
+        let currentFilter = null;
+
+        // Inicializar la aplicación
+        function initApplication() {
+            console.log("🚀 Iniciando aplicación...");
+            
+            // Calcular conexiones
+            calculateConnections();
+            
+            // Llenar el dropdown PRIMERO
+            fillMunicipioSelect();
+            
+            // Inicializar visualizaciones
+            initMap();
+            initGraph();
+            
+            // Actualizar UI
+            updateFilterStatus();
+            
+            console.log("✅ Aplicación iniciada correctamente");
+            document.getElementById('map-debug').textContent = 'Mapa listo - ' + graphData.nodes.length + ' municipios';
+            document.getElementById('graph-debug').textContent = 'Grafo listo - ' + graphData.links.length + ' conexiones';
+        }
+
+        // Calcular número de conexiones por municipio
+        function calculateConnections() {
+            graphData.nodes.forEach(node => {
+                node.connectionCount = graphData.links.filter(link => 
+                    link.source.id === node.id || link.target.id === node.id
+                ).length;
+            });
+        }
+
+        // LLENAR DROPDOWN - FUNCIÓN SIMPLIFICADA Y GARANTIZADA
+        function fillMunicipioSelect() {
+            console.log("📋 Llenando dropdown con municipios...");
+            const select = document.getElementById('municipio-select');
+            
+            // Limpiar opciones existentes (excepto la primera)
+            while (select.children.length > 1) {
+                select.removeChild(select.lastChild);
+            }
+            
+            // Ordenar municipios por número de conexiones
+            const sortedNodes = [...graphData.nodes].sort((a, b) => b.connectionCount - a.connectionCount);
+            
+            // Agregar cada municipio al dropdown
+            sortedNodes.forEach(node => {
+                const option = document.createElement('option');
+                option.value = node.id;
+                option.textContent = `${node.id} (${node.connectionCount} conexiones)`;
+                select.appendChild(option);
+            });
+            
+            // Agregar event listener para actualizar información cuando se seleccione
+            select.addEventListener('change', function() {
+                selectedMunicipio = this.value;
+                updateMunicipioInfo();
+            });
+            
+            console.log("✅ Dropdown llenado con", sortedNodes.length, "municipios");
+        }
+
+        // Actualizar información del municipio seleccionado
+        function updateMunicipioInfo() {
+            const infoDiv = document.getElementById('municipio-info');
+            
+            if (!selectedMunicipio) {
+                infoDiv.innerHTML = "Selecciona un municipio para ver sus detalles";
+                return;
+            }
+            
+            const node = graphData.nodes.find(n => n.id === selectedMunicipio);
+            if (!node) return;
+            
+            const connections = graphData.links.filter(link => 
+                link.source.id === selectedMunicipio || link.target.id === selectedMunicipio
+            );
+            
+            infoDiv.innerHTML = `
+                <strong>${node.id}</strong><br>
+                Región: ${node.region}<br>
+                Población: ${node.population.toLocaleString()}<br>
+                Conexiones: ${node.connectionCount}<br>
+                Volumen recibido: ${node.toneladas}t
+            `;
+        }
+
+        // Inicializar mapa
+        function initMap() {
+            map = L.map('map').setView([4.5709, -74.2973], 6);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '©OpenStreetMap, ©CartoDB'
+            }).addTo(map);
+
+            // Agregar marcadores
+            Object.keys(citiesData).forEach(city => {
+                const data = citiesData[city];
+                const marker = L.circleMarker([data.lat, data.lng], {
+                    radius: 8,
+                    fillColor: '#2c5aa0',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.7
+                }).addTo(map);
+
+                marker.bindPopup(`
+                    <div style="color: #333;">
+                        <strong>${city}</strong><br>
+                        Región: ${data.region}<br>
+                        Población: ${data.population.toLocaleString()}
+                    </div>
+                `);
+
+                cityMarkers[city] = marker;
+            });
+        }
+
+        // Inicializar grafo
+        function initGraph() {
+            const graphElement = document.getElementById('graph');
+            const width = graphElement.clientWidth;
+            const height = graphElement.clientHeight;
+
+            svg = d3.select('#graph')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            linkGroup = svg.append('g').attr('class', 'links');
+            nodeGroup = svg.append('g').attr('class', 'nodes');
+
+            // Configurar simulación de fuerzas
+            simulation = d3.forceSimulation(graphData.nodes)
+                .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-50))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+
+            // Actualizar visualización
+            updateVisualization();
+        }
+
+        // Actualizar toda la visualización
+        function updateVisualization() {
+            updateGraph();
+            updateMap();
+            updateFilterStatus();
+            updateNetworkInfo();
+        }
+
+        function updateGraph() {
+            // Determinar qué elementos mostrar
+            let nodesToShow = graphData.nodes;
+            let linksToShow = graphData.links;
+
+            if (currentFilter) {
+                const connectedNodes = new Set([currentFilter]);
+                const connectedLinks = graphData.links.filter(link => 
+                    link.source.id === currentFilter || link.target.id === currentFilter
+                );
+
+                connectedLinks.forEach(link => {
+                    connectedNodes.add(link.source.id);
+                    connectedNodes.add(link.target.id);
+                });
+
+                nodesToShow = graphData.nodes.filter(node => connectedNodes.has(node.id));
+                linksToShow = connectedLinks;
+            }
+
+            // Actualizar enlaces
+            const links = linkGroup.selectAll('line')
+                .data(linksToShow)
+                .join('line')
+                .attr('stroke', '#999')
+                .attr('stroke-width', d => Math.max(1, d.value / 50))
+                .attr('opacity', currentFilter ? 0.6 : 0.8)
+                .style('pointer-events', 'none');
+
+            // Actualizar nodos
+            const nodes = nodeGroup.selectAll('circle')
+                .data(nodesToShow)
+                .join('circle')
+                .attr('r', 10)
+                .attr('fill', d => d.id === currentFilter ? '#ff6b6b' : '#2c5aa0')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2)
+                .style('pointer-events', 'none');
+
+            // Etiquetas
+            const labels = nodeGroup.selectAll('text')
+                .data(nodesToShow)
+                .join('text')
+                .text(d => d.id)
+                .attr('text-anchor', 'middle')
+                .attr('dy', -15)
+                .attr('fill', '#2c5aa0')
+                .attr('font-size', '10px')
+                .style('font-weight', 'bold')
+                .style('pointer-events', 'none');
+
+            // Actualizar simulación
+            simulation.nodes(nodesToShow);
+            simulation.force('link').links(linksToShow);
+            simulation.alpha(0.3).restart();
+
+            // Animación
+            simulation.on('tick', () => {
+                links
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                nodes
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+
+                labels
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+        }
+
+        function updateMap() {
+            // Resetear todos los marcadores
+            Object.values(cityMarkers).forEach(marker => {
+                marker.setStyle({
+                    fillColor: '#2c5aa0',
+                    radius: 8
+                });
+            });
+
+            if (currentFilter) {
+                // Resaltar municipio del filtro
+                if (cityMarkers[currentFilter]) {
+                    cityMarkers[currentFilter].setStyle({
+                        fillColor: '#ff6b6b',
+                        radius: 12
+                    });
+                }
+
+                // Centrar en el municipio
+                const cityData = citiesData[currentFilter];
+                if (cityData) {
+                    map.setView([cityData.lat, cityData.lng], 7);
+                }
+            }
+        }
+
+        // Aplicar filtro
+        function applyFilter() {
+            if (selectedMunicipio) {
+                currentFilter = selectedMunicipio;
+                updateVisualization();
+                document.getElementById('graph-debug').textContent = `Filtro: ${selectedMunicipio}`;
+            } else {
+                alert('Por favor selecciona un municipio primero');
+            }
+        }
+
+        // Limpiar filtro
+        function clearFilter() {
+            currentFilter = null;
+            selectedMunicipio = null;
+            document.getElementById('municipio-select').value = '';
+            document.getElementById('municipio-info').innerHTML = "Selecciona un municipio para ver sus detalles";
+            updateVisualization();
+            document.getElementById('graph-debug').textContent = 'Mostrando toda la red';
+        }
+
+        function updateFilterStatus() {
+            const statusElement = document.getElementById('filter-status');
+            if (currentFilter) {
+                statusElement.textContent = `Filtro activo: ${currentFilter}`;
+                statusElement.classList.add('active');
+            } else {
+                statusElement.textContent = 'Sin filtro activo - Mostrando toda la red';
+                statusElement.classList.remove('active');
+            }
+        }
+
+        function updateNetworkInfo() {
+            const infoDiv = document.getElementById('network-info');
+            
+            if (!currentFilter) {
+                infoDiv.innerHTML = `
+                    <strong>Red completa</strong><br>
+                    ${graphData.nodes.length} municipios<br>
+                    ${graphData.links.length} conexiones
+                `;
+                return;
+            }
+
+            const connections = graphData.links.filter(link => 
+                link.source.id === currentFilter || link.target.id === currentFilter
+            );
+
+            const connectedCities = [...new Set(connections.flatMap(link => 
+                [link.source.id, link.target.id].filter(id => id !== currentFilter)
+            ))];
+
+            infoDiv.innerHTML = `
+                <strong>${currentFilter}</strong><br>
+                ${connections.length} conexiones activas<br>
+                Conectado con: ${connectedCities.join(', ')}
+            `;
+        }
+
+        // Funciones de control
+        function simulatePhysics() {
+            simulation.alphaTarget(0.1).restart();
+            setTimeout(() => simulation.alphaTarget(0), 2000);
+        }
+
+        function resetGraphLayout() {
+            graphData.nodes.forEach(node => {
+                node.fx = null;
+                node.fy = null;
+            });
+            simulation.alpha(1).restart();
+        }
+
+        function fitMapToCities() {
+            const bounds = new L.LatLngBounds();
+            Object.values(citiesData).forEach(city => {
+                bounds.extend([city.lat, city.lng]);
+            });
+            map.fitBounds(bounds, { padding: [30, 30] });
+        }
+
+        // Inicializar aplicación cuando se carga la página
+        window.addEventListener('load', initApplication);
+
+        // Hacer funciones globales
+        window.applyFilter = applyFilter;
+        window.clearFilter = clearFilter;
+        window.simulatePhysics = simulatePhysics;
+        window.resetGraphLayout = resetGraphLayout;
+        window.fitMapToCities = fitMapToCities;
+
+        // Función de debug para probar manualmente
+        window.forceFillDropdown = function() {
+            fillMunicipioSelect();
+            alert('Dropdown forzado a llenarse. Revisa la consola para detalles.');
+        }
+    </script>
+</body>
+</html>
