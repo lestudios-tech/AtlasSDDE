@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Empresas por Localidad - Bogotá</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1a3a5f 0%, #2c3e50 100%);
+            color: white;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background-color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .year-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .year-slider {
+            width: 300px;
+        }
+        
+        .year-display {
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #2c3e50;
+            min-width: 80px;
+        }
+        
+        .stats-summary {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+        
+        .content {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        
+        .map-container {
+            flex: 2;
+            position: relative;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .info-container {
+            flex: 1;
+            background-color: white;
+            padding: 20px;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .localidad-info {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .localidad-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .localidad-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .localidad-id {
+            background-color: #2c3e50;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-card {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-3px);
+        }
+        
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .chart-container {
+            flex: 1;
+            min-height: 300px;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .legend {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 250px;
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border-radius: 3px;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+        
+        @media (max-width: 992px) {
+            .content {
+                flex-direction: column;
+            }
+            .map-container, .info-container {
+                flex: 1;
+            }
+            .info-container {
+                max-height: 45vh;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .year-slider {
+                width: 100%;
+            }
+            .stats-summary {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Empresas por Localidad - Bogotá</h1>
+            <p>Visualización de datos empresariales por localidad y año</p>
+        </div>
+        
+        <div class="controls">
+            <div class="year-control">
+                <span>Año:</span>
+                <input type="range" id="year-slider" class="year-slider" min="2017" max="2025" value="2023" step="1">
+                <div id="year-display" class="year-display">2023</div>
+            </div>
+            
+            <div class="stats-summary">
+                <div class="stat-box">
+                    <div class="stat-value" id="total-empresas">-</div>
+                    <div class="stat-label">Total Empresas</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="empresas-activas">-</div>
+                    <div class="stat-label">Empresas Activas</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="tasa-crecimiento">-</div>
+                    <div class="stat-label">Crecimiento Anual</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+            <div class="info-container">
+                <div class="localidad-info">
+                    <div class="localidad-header">
+                        <div class="localidad-name" id="localidad-nombre">Selecciona una localidad</div>
+                        <div class="localidad-id" id="localidad-id">-</div>
+                    </div>
+                    <p id="localidad-descripcion">Haz clic en una localidad del mapa para ver información detallada</p>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="empresas-total">-</div>
+                            <div class="stat-label">Total Empresas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="empresas-activas-localidad">-</div>
+                            <div class="stat-label">Empresas Activas</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="tasa-crecimiento-localidad">-</div>
+                            <div class="stat-label">Crecimiento Anual</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="densidad">-</div>
+                            <div class="stat-label">Empresas/km²</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="empresas-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // GeoJSON con todas las localidades de Bogotá
+        const bogotaLocalidades = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 1,
+                        "nombre": "Usaquén",
+                        "area": 6548
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.083, 4.780], [-74.052, 4.780], [-74.052, 4.750], [-74.083, 4.750], [-74.083, 4.780]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 2,
+                        "nombre": "Chapinero",
+                        "area": 3858
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.083, 4.750], [-74.052, 4.750], [-74.052, 4.720], [-74.083, 4.720], [-74.083, 4.750]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 3,
+                        "nombre": "Santa Fe",
+                        "area": 4528
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.083, 4.720], [-74.052, 4.720], [-74.052, 4.690], [-74.083, 4.690], [-74.083, 4.720]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 4,
+                        "nombre": "San Cristóbal",
+                        "area": 4918
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.690], [-74.083, 4.690], [-74.083, 4.660], [-74.115, 4.660], [-74.115, 4.690]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 5,
+                        "nombre": "Usme",
+                        "area": 22158
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.660], [-74.083, 4.660], [-74.083, 4.630], [-74.115, 4.630], [-74.115, 4.660]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 6,
+                        "nombre": "Tunjuelito",
+                        "area": 9911
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.148, 4.690], [-74.115, 4.690], [-74.115, 4.660], [-74.148, 4.660], [-74.148, 4.690]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 7,
+                        "nombre": "Bosa",
+                        "area": 23898
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.180, 4.720], [-74.148, 4.720], [-74.148, 4.690], [-74.180, 4.690], [-74.180, 4.720]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 8,
+                        "nombre": "Kennedy",
+                        "area": 3858
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.148, 4.720], [-74.115, 4.720], [-74.115, 4.690], [-74.148, 4.690], [-74.148, 4.720]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 9,
+                        "nombre": "Fontibón",
+                        "area": 3328
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.180, 4.750], [-74.148, 4.750], [-74.148, 4.720], [-74.180, 4.720], [-74.180, 4.750]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 10,
+                        "nombre": "Engativá",
+                        "area": 3628
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.750], [-74.083, 4.750], [-74.083, 4.720], [-74.115, 4.720], [-74.115, 4.750]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 11,
+                        "nombre": "Suba",
+                        "area": 10058
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.780], [-74.083, 4.780], [-74.083, 4.750], [-74.115, 4.750], [-74.115, 4.780]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 12,
+                        "nombre": "Barrios Unidos",
+                        "area": 1198
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.083, 4.690], [-74.052, 4.690], [-74.052, 4.660], [-74.083, 4.660], [-74.083, 4.690]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 13,
+                        "nombre": "Teusaquillo",
+                        "area": 1418
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.690], [-74.083, 4.690], [-74.083, 4.660], [-74.115, 4.660], [-74.115, 4.690]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 14,
+                        "nombre": "Los Mártires",
+                        "area": 658
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.660], [-74.083, 4.660], [-74.083, 4.630], [-74.115, 4.630], [-74.115, 4.660]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 15,
+                        "nombre": "Antonio Nariño",
+                        "area": 4880
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.630], [-74.083, 4.630], [-74.083, 4.600], [-74.115, 4.600], [-74.115, 4.630]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 16,
+                        "nombre": "Puente Aranda",
+                        "area": 1728
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.148, 4.690], [-74.115, 4.690], [-74.115, 4.660], [-74.148, 4.660], [-74.148, 4.690]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 17,
+                        "nombre": "La Candelaria",
+                        "area": 218
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.083, 4.660], [-74.052, 4.660], [-74.052, 4.630], [-74.083, 4.630], [-74.083, 4.660]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 18,
+                        "nombre": "Rafael Uribe Uribe",
+                        "area": 13834
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.115, 4.630], [-74.083, 4.630], [-74.083, 4.600], [-74.115, 4.600], [-74.115, 4.630]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 19,
+                        "nombre": "Ciudad Bolívar",
+                        "area": 12998
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.180, 4.660], [-74.148, 4.660], [-74.148, 4.630], [-74.180, 4.630], [-74.180, 4.660]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": {
+                        "id": 20,
+                        "nombre": "Sumapaz",
+                        "area": 78058
+                    },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-74.250, 4.600], [-74.180, 4.600], [-74.180, 4.530], [-74.250, 4.530], [-74.250, 4.600]
+                        ]]
+                    }
+                }
+            ]
+        };
+
+        // Generar datos teóricos para todas las localidades (2017-2025)
+        const empresasData = {};
+        const years = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025];
+        
+        // Datos base por localidad (para 2023)
+        const baseData = {
+            "Usaquén": { base: 18500, growth: 0.045, active: 0.92 },
+            "Chapinero": { base: 16200, growth: 0.038, active: 0.94 },
+            "Santa Fe": { base: 14300, growth: 0.042, active: 0.89 },
+            "San Cristóbal": { base: 9800, growth: 0.035, active: 0.87 },
+            "Usme": { base: 7200, growth: 0.028, active: 0.85 },
+            "Tunjuelito": { base: 8900, growth: 0.031, active: 0.86 },
+            "Bosa": { base: 12500, growth: 0.040, active: 0.88 },
+            "Kennedy": { base: 16800, growth: 0.037, active: 0.90 },
+            "Fontibón": { base: 11200, growth: 0.036, active: 0.91 },
+            "Engativá": { base: 15200, growth: 0.039, active: 0.92 },
+            "Suba": { base: 19800, growth: 0.046, active: 0.93 },
+            "Barrios Unidos": { base: 10800, growth: 0.034, active: 0.94 },
+            "Teusaquillo": { base: 9500, growth: 0.033, active: 0.93 },
+            "Los Mártires": { base: 6800, growth: 0.029, active: 0.86 },
+            "Antonio Nariño": { base: 12500, growth: 0.042, active: 0.91 },
+            "Puente Aranda": { base: 13200, growth: 0.035, active: 0.89 },
+            "La Candelaria": { base: 5200, growth: 0.025, active: 0.95 },
+            "Rafael Uribe Uribe": { base: 15600, growth: 0.044, active: 0.88 },
+            "Ciudad Bolívar": { base: 8400, growth: 0.030, active: 0.84 },
+            "Sumapaz": { base: 1200, growth: 0.015, active: 0.80 }
+        };
+        
+        // Generar datos históricos y proyectados
+        bogotaLocalidades.features.forEach(feature => {
+            const nombre = feature.properties.nombre;
+            const base = baseData[nombre];
+            const data = {
+                area: feature.properties.area,
+                historico: {}
+            };
+            
+            // Generar datos para cada año
+            years.forEach((year, index) => {
+                // Ajuste por COVID en 2020
+                let adjustment = 1;
+                if (year === 2020) adjustment = 0.85;
+                if (year === 2021) adjustment = 0.95;
+                
+                // Calcular valor para el año
+                const yearsFromBase = year - 2023;
+                const value = Math.round(base.base * Math.pow(1 + base.growth, yearsFromBase) * adjustment);
+                const active = Math.round(value * base.active);
+                const growth = year > 2017 ? base.growth * 100 : 0;
+                
+                data.historico[year] = {
+                    total: value,
+                    activas: active,
+                    crecimiento: growth,
+                    densidad: Math.round(value / (feature.properties.area / 100))
+                };
+            });
+            
+            empresasData[nombre] = data;
+        });
+
+        // Inicializar el mapa
+        const map = L.map('map').setView([4.60971, -74.08175], 11);
+
+        // Añadir capa base
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Colores para las localidades
+        const getColor = (d) => {
+            return d > 18000 ? '#800026' :
+                   d > 15000 ? '#BD0026' :
+                   d > 12000 ? '#E31A1C' :
+                   d > 10000 ? '#FC4E2A' :
+                   d > 8000  ? '#FD8D3C' :
+                   d > 6000  ? '#FEB24C' :
+                   d > 4000  ? '#FED976' :
+                   d > 2000  ? '#FFEDA0' :
+                              '#FFFFCC';
+        };
+
+        // Estilo para las localidades
+        const style = (feature) => {
+            const localidad = feature.properties.nombre;
+            const currentYear = parseInt(document.getElementById('year-slider').value);
+            const totalEmpresas = empresasData[localidad] ? 
+                empresasData[localidad].historico[currentYear].total : 0;
+            
+            return {
+                fillColor: getColor(totalEmpresas),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
+        };
+
+        // Función para resaltar la localidad al pasar el mouse
+        const highlightFeature = (e) => {
+            const layer = e.target;
+            layer.setStyle({
+                weight: 4,
+                color: '#2c3e50',
+                dashArray: '',
+                fillOpacity: 0.9
+            });
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
+        };
+
+        // Función para resetear el resaltado
+        const resetHighlight = (e) => {
+            geojson.resetStyle(e.target);
+        };
+
+        // Variable para almacenar la localidad seleccionada
+        let selectedLocalidad = null;
+
+        // Función para manejar el clic en una localidad
+        const onEachFeature = (feature, layer) => {
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: (e) => {
+                    // Prevenir zoom al hacer clic
+                    e.originalEvent.preventDefault();
+                    e.originalEvent.stopPropagation();
+                    
+                    // Actualizar localidad seleccionada
+                    selectedLocalidad = feature.properties.nombre;
+                    
+                    // Actualizar información de la localidad
+                    updateLocalidadInfo(feature.properties);
+                    
+                    // Actualizar gráfico
+                    updateChart();
+                }
+            });
+        };
+
+        // Añadir el GeoJSON al mapa
+        const geojson = L.geoJSON(bogotaLocalidades, {
+            style: style,
+            onEachFeature: onEachFeature
+        }).addTo(map);
+
+        // Ajustar el mapa al área del GeoJSON
+        map.fitBounds(geojson.getBounds());
+
+        // Añadir leyenda
+        const legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            const div = L.DomUtil.create('div', 'legend');
+            const grades = [0, 2000, 4000, 6000, 8000, 10000, 12000, 15000, 18000];
+            const labels = [];
+
+            // Título de la leyenda
+            div.innerHTML = '<div class="legend-title">Empresas</div>';
+
+            // Generar elementos de la leyenda
+            for (let i = 0; i < grades.length; i++) {
+                div.innerHTML +=
+                    '<div class="legend-item">' +
+                    '<i class="legend-color" style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                    grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] : '+') +
+                    '</div>';
+            }
+
+            return div;
+        };
+        legend.addTo(map);
+
+        // Variables para el gráfico
+        let empresasChart = null;
+
+        // Actualizar estadísticas generales
+        function updateGeneralStats() {
+            const currentYear = parseInt(document.getElementById('year-slider').value);
+            let totalEmpresas = 0;
+            let totalActivas = 0;
+            let crecimientoPromedio = 0;
+            let count = 0;
+            
+            Object.keys(empresasData).forEach(localidad => {
+                const data = empresasData[localidad].historico[currentYear];
+                totalEmpresas += data.total;
+                totalActivas += data.activas;
+                crecimientoPromedio += data.crecimiento;
+                count++;
+            });
+            
+            crecimientoPromedio = count > 0 ? (crecimientoPromedio / count).toFixed(1) : 0;
+            
+            document.getElementById('total-empresas').textContent = totalEmpresas.toLocaleString();
+            document.getElementById('empresas-activas').textContent = totalActivas.toLocaleString();
+            document.getElementById('tasa-crecimiento').textContent = crecimientoPromedio + '%';
+        }
+
+        // Función para actualizar la información de la localidad
+        function updateLocalidadInfo(properties) {
+            const nombre = properties.nombre;
+            const currentYear = parseInt(document.getElementById('year-slider').value);
+            const data = empresasData[nombre] ? 
+                empresasData[nombre].historico[currentYear] : 
+                { total: 0, activas: 0, crecimiento: 0, densidad: 0 };
+            
+            document.getElementById('localidad-nombre').textContent = nombre;
+            document.getElementById('localidad-id').textContent = `ID: ${properties.id}`;
+            document.getElementById('localidad-descripcion').textContent = 
+                `Área: ${properties.area.toLocaleString()} km²`;
+            
+            document.getElementById('empresas-total').textContent = data.total.toLocaleString();
+            document.getElementById('empresas-activas-localidad').textContent = data.activas.toLocaleString();
+            document.getElementById('tasa-crecimiento-localidad').textContent = data.crecimiento.toFixed(1) + '%';
+            document.getElementById('densidad').textContent = data.densidad;
+        }
+
+        // Función para actualizar el gráfico
+        function updateChart() {
+            const ctx = document.getElementById('empresas-chart').getContext('2d');
+            const currentYear = parseInt(document.getElementById('year-slider').value);
+            
+            // Datos para el gráfico
+            let chartData, chartLabel;
+            
+            if (selectedLocalidad) {
+                // Mostrar datos de la localidad seleccionada
+                const data = empresasData[selectedLocalidad];
+                const valores = years.map(year => data.historico[year].total);
+                
+                chartData = [{
+                    label: `Empresas en ${selectedLocalidad}`,
+                    data: valores,
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                }];
+                chartLabel = `Evolución de Empresas (2017-2025) - ${selectedLocalidad}`;
+            } else {
+                // Mostrar total de empresas en Bogotá
+                const totales = years.map(year => {
+                    return Object.keys(empresasData).reduce((sum, localidad) => {
+                        return sum + empresasData[localidad].historico[year].total;
+                    }, 0);
+                });
+                
+                chartData = [{
+                    label: 'Total de Empresas en Bogotá',
+                    data: totales,
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                }];
+                chartLabel = 'Evolución Total de Empresas en Bogotá (2017-2025)';
+            }
+            
+            // Destruir gráfico anterior si existe
+            if (empresasChart) {
+                empresasChart.destroy();
+            }
+            
+            // Crear nuevo gráfico
+            empresasChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: chartData
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: chartLabel,
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Número de Empresas'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Año'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Actualizar el mapa cuando cambia el año
+        document.getElementById('year-slider').addEventListener('input', function() {
+            const year = this.value;
+            document.getElementById('year-display').textContent = year;
+            
+            // Actualizar estilos del mapa
+            geojson.setStyle(style);
+            
+            // Actualizar estadísticas generales
+            updateGeneralStats();
+            
+            // Actualizar información de la localidad seleccionada
+            if (selectedLocalidad) {
+                const feature = bogotaLocalidades.features.find(f => f.properties.nombre === selectedLocalidad);
+                if (feature) {
+                    updateLocalidadInfo(feature.properties);
+                }
+            }
+            
+            // Actualizar gráfico
+            updateChart();
+        });
+
+        // Inicializar la aplicación
+        updateGeneralStats();
+        updateChart();
+    </script>
+</body>
+</html>
